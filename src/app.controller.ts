@@ -6,12 +6,10 @@ import { ConfigService } from '@nestjs/config';
 export class AppController {
   constructor(
     private readonly appService: AppService,
-    private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   @Get()
   getHello(): string {
-    console.log(this.configService.get('MONGODB_URI'));
     return this.appService.getHello();
   }
 }
