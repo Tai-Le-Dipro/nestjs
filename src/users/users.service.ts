@@ -4,14 +4,14 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { User } from './schemas/user.schema';
 import { Connection, Model } from 'mongoose';
-import { genSaltSync, hashSync } from "bcryptjs";
+import { genSaltSync, hashSync, compareSync } from 'bcryptjs';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectConnection() private connection: Connection,
-    @InjectModel(User.name) private userModel: Model<User>
-  ) { }
+    @InjectModel(User.name) private userModel: Model<User>,
+  ) {}
 
   async create(createUserDto: CreateUserDto) {
     const salt = genSaltSync(10);
@@ -19,38 +19,41 @@ export class UsersService {
 
     return await this.userModel.create({
       ...createUserDto,
-      password: hash
-    })
+      password: hash,
+    });
   }
 
   findAll() {
-    return this.userModel.find()
+    return this.userModel.find();
   }
 
   async findOne(id: string) {
     try {
       const user = await this.userModel.findById({
-        _id: id
-      })
+        _id: id,
+      });
       if (!user) {
-        throw new NotFoundException('User not found')
+        throw new NotFoundException('User not found');
       } else {
-        return user
+        return user;
       }
     } catch (error) {
       if (error instanceof NotFoundException) {
-        throw error
+        throw error;
       }
     }
   }
 
   async update(id: string, updateUserDto: UpdateUserDto) {
     try {
-      const updatedUser = await this.userModel.findByIdAndUpdate({
-        _id: id
-      }, { ...updateUserDto })
+      const updatedUser = await this.userModel.findByIdAndUpdate(
+        {
+          _id: id,
+        },
+        { ...updateUserDto },
+      );
 
-      return updatedUser
+      return updatedUser;
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
@@ -66,13 +69,13 @@ export class UsersService {
   remove(id: string) {
     try {
       const deletedUser = this.userModel.deleteOne({
-        _id: id
-      })
+        _id: id,
+      });
 
       if (deletedUser) {
         return {
-          message: 'User deleted successfully'
-        }
+          message: 'User deleted successfully',
+        };
       }
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -80,5 +83,19 @@ export class UsersService {
       }
       throw new Error(`Failed to update user: ${error.message}`);
     }
+  }
+
+  comparePasswords(password: string, hash: string) {
+    return compareSync(password, hash);
+  }
+
+  async findByEmail(email: string) {
+    const user = await this.userModel.findOne({ email });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user;
   }
 }
