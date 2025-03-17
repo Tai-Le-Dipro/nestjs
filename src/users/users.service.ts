@@ -1,22 +1,31 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import { User } from './schemas/user.schema';
-import { Connection, Model } from 'mongoose';
+import { User, UserDocument } from './schemas/user.schema';
+import { Connection } from 'mongoose';
 import { genSaltSync, hashSync, compareSync } from 'bcryptjs';
+import { SoftDeleteModel } from 'soft-delete-plugin-mongoose';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectConnection() private connection: Connection,
-    @InjectModel(User.name) private userModel: Model<User>,
+    @InjectModel(User.name) private userModel: SoftDeleteModel<UserDocument>,
   ) {}
 
   async create(createUserDto: CreateUserDto) {
     const salt = genSaltSync(10);
     const hash = hashSync(createUserDto.password, salt);
-
+    // check email exits
+    const user = await this.userModel.findOne({ email: createUserDto.email });
+    if (user) {
+      throw new ConflictException('Email already exists');
+    }
     return await this.userModel.create({
       ...createUserDto,
       password: hash,
@@ -66,23 +75,16 @@ export class UsersService {
     }
   }
 
-  remove(id: string) {
-    try {
-      const deletedUser = this.userModel.deleteOne({
-        _id: id,
-      });
+  async remove(id: string) {
+    const result = await this.userModel.softDelete({
+      _id: id,
+    });
 
-      if (deletedUser) {
-        return {
-          message: 'User deleted successfully',
-        };
-      }
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      throw new Error(`Failed to update user: ${error.message}`);
+    if (!result) {
+      throw new NotFoundException(`User with ID "${id}" not found`);
     }
+
+    return result;
   }
 
   comparePasswords(password: string, hash: string) {
